@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Serpentine Dream Chess</title>
+
+<style>
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: #111;
+    color: #eee;
+    font-family: Arial, Helvetica, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+h1 { margin-bottom: 4px; }
+.byline { color: #aaa; margin-bottom: 16px; }
+
+#game {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    padding: 10px;
+    width: min(1180px, 100%);
+}
+
+#boardWrap {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#board {
+    width: min(80vw, 720px);
+    min-height: min(58vw, 520px);
+    max-height: min(80vw, 720px);
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    /* Keep the slightly "warping" auto-row behavior, but never let a row
+       collapse below a usable height. */
+    grid-auto-rows: minmax(34px, auto);
+    border: 4px solid #777;
+    background: #111;
+}
+
+.square {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 34px;
+    font-size: clamp(28px, 7.4vw, 68px);
+    cursor: pointer;
+    user-select: none;
+    overflow: hidden;
+}
+
+.mirror { background: #e8ddc7; color: black; }
+.serpentine { background: #292929; color: white; }
+
+.center { box-shadow: inset 0 0 0 4px #8060c0; }
+.selected { box-shadow: inset 0 0 0 5px #ffd45a; }
+
+.legal::after {
+    content: "";
+    position: absolute;
+    width: 22%;
+    height: 22%;
+    min-width: 10px;
+    min-height: 10px;
+    border-radius: 50%;
+    background: #69b34c;
+    opacity: .9;
+    z-index: 1;
+}
+
+.capture::after {
+    content: "";
+    position: absolute;
+    width: 70%;
+    height: 70%;
+    border-radius: 50%;
+    border: 5px solid #d34d4d;
+    z-index: 1;
+}
+
+.piece {
+    position: relative;
+    z-index: 2;
+}
+
+.role {
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    z-index: 3;
+    background: black;
+    color: white;
+    border: 1px solid #999;
+    border-radius: 10px;
+    padding: 2px 5px;
+    font-size: 11px;
+}
+
+.coord {
+    position: absolute;
+    z-index: 4;
+    font-size: 10px;
+    font-weight: 700;
+    opacity: .65;
+    pointer-events: none;
+}
+
+.coord.file { right: 3px; bottom: 2px; }
+.coord.rank { left: 3px; top: 2px; }
+
+#panel {
+    width: 320px;
+    background: #1c1c1c;
+    padding: 15px;
+    border-radius: 8px;
+    position: sticky;
+    top: 10px;
+}
+
+#serpentinePanel {
+    display: none;
+    background: #251f30;
+    border: 1px solid #8060c0;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 12px;
+}
+
+#serpentinePanel h3 {
+    margin: 0 0 8px;
+}
+
+#serpentineChoices {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+#serpentineChoices button {
+    min-width: 62px;
+    font-size: 24px;
+}
+
+#status {
+    font-size: 20px;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+button {
+    background: #333;
+    color: white;
+    border: 1px solid #666;
+    border-radius: 5px;
+    padding: 8px 12px;
+    cursor: pointer;
+    margin: 3px;
+}
+
+button:hover { background: #444; }
+
+#log {
+    background: #111;
+    padding: 8px;
+    height: 220px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    font-family: monospace;
+    font-size: 12px;
+    margin-top: 10px;
+}
+
+#captured {
+    margin-top: 12px;
+    font-size: 14px;
+}
+
+#rescueOverlay,
+#promotionOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.84);
+    z-index: 100;
+    justify-content: center;
+    align-items: center;
+    padding: 18px;
+}
+
+.choiceBox {
+    background: #222;
+    border: 1px solid #777;
+    border-radius: 10px;
+    padding: 20px;
+    width: min(520px, 92vw);
+    text-align: center;
+}
+
+.choiceButtons {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.choiceButtons button {
+    font-size: 30px;
+    min-width: 70px;
+}
+
+.small {
+    color: #aaa;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+@media(max-width: 900px) {
+    #game {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    #panel {
+        width: min(94vw, 720px);
+        position: static;
+    }
+
+    #board {
+        width: 94vw;
+        min-height: 72vw;
+        max-height: none;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<h1>Serpentine Dream Chess</h1>
+<div class="byline">WhiteRabbitGeometry — Benjamin Jason Ortlip</div>
+
+<div id="game">
+
+    <div id="boardWrap">
+        <div id="board"></div>
+    </div>
+
+    <div id="panel">
+
+        <!-- Persistent Serpentine Choice box -->
+        <div id="serpentinePanel">
+            <h3>Serpentine Choice</h3>
+            <div id="serpentinePrompt" class="small"></div>
+            <div id="serpentineChoices"></div>
+            <div id="keepRoleArea"></div>
+        </div>
+
+        <div id="status"></div>
+
+        <button onclick="newGame()">New Game</button>
+        <button onclick="undo()">Undo</button>
+        <button onclick="flipBoard()">Flip Board</button>
+
+        <div style="margin-top:10px;">
+            <label>
+                <input id="bonusToggle" type="checkbox" checked
+                       onchange="state.bonus=this.checked">
+                Dream Mirror Bonus
+            </label>
+        </div>
+
+        <div id="captured"></div>
+
+        <h3>Move Log</h3>
+        <div id="log"></div>
+
+    </div>
+</div>
+
+<!-- Dream Mirror Bonus deliberately interrupts play -->
+<div id="rescueOverlay">
+    <div class="choiceBox">
+        <h2>Dream Mirror Bonus</h2>
+        <p>
+            You protect both central squares of your opponent's color.
+            Rescue a captured pawn?
+        </p>
+        <div id="rescueSquares" class="choiceButtons"></div>
+        <button onclick="skipRescue()">Skip</button>
+    </div>
+</div>
+
+<div id="promotionOverlay">
+    <div class="choiceBox">
+        <h2>Pawn Promotion</h2>
+        <div id="promotionChoices" class="choiceButtons"></div>
+    </div>
+</div>
+
+<script>
+const FILES = "abcdefgh";
+
+const CENTER = new Set(["d4","e4","d5","e5"]);
+
+const GLYPHS = {
+    white: {
+        king:"♔", queen:"♕", rook:"♖",
+        bishop:"♗", knight:"♘", pawn:"♙"
+    },
+    black: {
+        king:"♚", queen:"♛", rook:"♜",
+        bishop:"♝", knight:"♞", pawn:"♟"
+    }
+};
+
+const SHORT = {
+    king:"K", queen:"Q", rook:"R",
+    bishop:"B", knight:"N", pawn:"P"
+};
+
+let state;
+let history = [];
+let selected = null;
+let legalTargets = [];
+let flipped = false;
+let rescuePhase = false;
+
+/* Pending Serpentine move while user chooses a role in the persistent side panel. */
+let pendingSerpentineMove = null;
+
+function copy(obj) {
+    return JSON.parse(JSON.stringify(obj));
+}
+
+function enemy(color) {
+    return color === "white" ? "black" : "white";
+}
+
+function inside(r,c) {
+    return r >= 0 && r < 8 && c >= 0 && c < 8;
+}
+
+function squareName(r,c) {
+    return FILES[c] + (8-r);
+}
+
+function squareCoords(name) {
+    return [8 - Number(name[1]), FILES.indexOf(name[0])];
+}
+
+function squareType(r,c) {
+    return ((r+c)%2 === 0) ? "mirror" : "serpentine";
+}
+
+function createPiece(color, representation, r, c) {
+    return {
+        id: Math.random().toString(36).slice(2),
+        color,
+        representation,
+        active: representation,
+        r,
+        c,
+        moved:false,
+        serpentineIdentity:false
+    };
+}
+
+function initialState() {
+    const pieces = [];
+    const back = [
+        "rook","knight","bishop","queen",
+        "king","bishop","knight","rook"
+    ];
+
+    for(let c=0;c<8;c++) {
+        pieces.push(createPiece("black", back[c], 0, c));
+        pieces.push(createPiece("black", "pawn", 1, c));
+        pieces.push(createPiece("white", "pawn", 6, c));
+        pieces.push(createPiece("white", back[c], 7, c));
+    }
+
+    return {
+        turn:"white",
+        pieces,
+        captured:{ white:[], black:[] },
+        enPassant:null,
+        bonus:true,
+        result:null,
+        log:[]
+    };
+}
+
+function pieceAt(r,c,game=state) {
+    return game.pieces.find(p => p.r===r && p.c===c) || null;
+}
+
+function getKing(color,game=state) {
+    return game.pieces.find(
+        p => p.color===color && p.representation==="king"
+    );
+}
+
+function attacksFrom(piece,game=state) {
+    const attacks = [];
+    const role = piece.representation==="king" ? "king" : piece.active;
+
+    function add(r,c) {
+        if(!inside(r,c)) return true;
+
+        const target = pieceAt(r,c,game);
+
+        /* Representational Queens may not threaten one another. */
+        if(
+            target &&
+            piece.representation==="queen" &&
+            target.representation==="queen" &&
+            target.color!==piece.color
+        ) {
+            return true;
+        }
+
+        attacks.push([r,c]);
+        return !!target;
+    }
+
+    if(role==="pawn") {
+        const dir = piece.color==="white" ? -1 : 1;
+        for(const dc of [-1,1]) {
+            const r = piece.r+dir;
+            const c = piece.c+dc;
+            if(inside(r,c)) add(r,c);
+        }
+    }
+    else if(role==="knight") {
+        for(const [dr,dc] of [
+            [-2,-1],[-2,1],[-1,-2],[-1,2],
+            [1,-2],[1,2],[2,-1],[2,1]
+        ]) {
+            add(piece.r+dr,piece.c+dc);
+        }
+    }
+    else if(role==="king") {
+        for(let dr=-1;dr<=1;dr++) {
+            for(let dc=-1;dc<=1;dc++) {
+                if(dr!==0 || dc!==0) add(piece.r+dr,piece.c+dc);
+            }
+        }
+    }
+    else {
+        const directions = [];
+
+        if(role==="rook" || role==="queen") {
+            directions.push([-1,0],[1,0],[0,-1],[0,1]);
+        }
+
+        if(role==="bishop" || role==="queen") {
+            directions.push([-1,-1],[-1,1],[1,-1],[1,1]);
+        }
+
+        for(const [dr,dc] of directions) {
+            let r = piece.r+dr;
+            let c = piece.c+dc;
+
+            while(inside(r,c)) {
+                if(add(r,c)) break;
+                r += dr;
+                c += dc;
+            }
+        }
+    }
+
+    return attacks;
+}
+
+function squareAttacked(r,c,color,game=state) {
+    return game.pieces.some(
+        piece =>
+        piece.color===color &&
+        attacksFrom(piece,game).some(([rr,cc]) => rr===r && cc===c)
+    );
+}
+
+function inCheck(color,game=state) {
+    const king = getKing(color,game);
+    if(!king) return false;
+
+    return squareAttacked(
+        king.r,
+        king.c,
+        enemy(color),
+        game
+    );
+}
+
+function pseudoMoves(piece,game=state) {
+    const moves = [];
+    const role = piece.representation==="king" ? "king" : piece.active;
+
+    function add(r,c,special=null) {
+        if(!inside(r,c)) return true;
+
+        const target = pieceAt(r,c,game);
+
+        if(target && target.color===piece.color) return true;
+
+        /* Kings are checked, not captured. */
+        if(target && target.representation==="king") return true;
+
+        /* Queens may not threaten/capture one another. */
+        if(
+            target &&
+            piece.representation==="queen" &&
+            target.representation==="queen"
+        ) {
+            return true;
+        }
+
+        moves.push({
+            r,c,special,
+            capture: target ? target.id : null
+        });
+
+        return !!target;
+    }
+
+    if(role==="pawn") {
+        const dir = piece.color==="white" ? -1 : 1;
+        const start = piece.color==="white" ? 6 : 1;
+
+        if(
+            inside(piece.r+dir,piece.c) &&
+            !pieceAt(piece.r+dir,piece.c,game)
+        ) {
+            moves.push({
+                r:piece.r+dir,
+                c:piece.c,
+                special:null,
+                capture:null
+            });
+
+            /* Only an actual pawn gets the initial 2-square privilege. */
+            if(
+                piece.representation==="pawn" &&
+                !piece.moved &&
+                piece.r===start &&
+                !pieceAt(piece.r+(2*dir),piece.c,game)
+            ) {
+                moves.push({
+                    r:piece.r+(2*dir),
+                    c:piece.c,
+                    special:"doublePawn",
+                    capture:null
+                });
+            }
+        }
+
+        for(const dc of [-1,1]) {
+            const r = piece.r+dir;
+            const c = piece.c+dc;
+
+            if(!inside(r,c)) continue;
+
+            const target = pieceAt(r,c,game);
+
+            if(
+                target &&
+                target.color!==piece.color &&
+                target.representation!=="king"
+            ) {
+                if(!(
+                    piece.representation==="queen" &&
+                    target.representation==="queen"
+                )) {
+                    moves.push({
+                        r,c,
+                        special:null,
+                        capture:target.id
+                    });
+                }
+            }
+            else if(
+                piece.representation==="pawn" &&
+                game.enPassant &&
+                game.enPassant.r===r &&
+                game.enPassant.c===c
+            ) {
+                moves.push({
+                    r,c,
+                    special:"enPassant",
+                    capture:game.enPassant.pawnId
+                });
+            }
+        }
+    }
+    else if(role==="knight") {
+        for(const [dr,dc] of [
+            [-2,-1],[-2,1],[-1,-2],[-1,2],
+            [1,-2],[1,2],[2,-1],[2,1]
+        ]) {
+            add(piece.r+dr,piece.c+dc);
+        }
+    }
+    else if(role==="king") {
+        for(let dr=-1;dr<=1;dr++) {
+            for(let dc=-1;dc<=1;dc++) {
+                if(dr!==0 || dc!==0) add(piece.r+dr,piece.c+dc);
+            }
+        }
+    }
+    else {
+        const directions = [];
+
+        if(role==="rook" || role==="queen") {
+            directions.push([-1,0],[1,0],[0,-1],[0,1]);
+        }
+
+        if(role==="bishop" || role==="queen") {
+            directions.push([-1,-1],[-1,1],[1,-1],[1,1]);
+        }
+
+        for(const [dr,dc] of directions) {
+            let r = piece.r+dr;
+            let c = piece.c+dc;
+
+            while(inside(r,c)) {
+                if(add(r,c)) break;
+                r += dr;
+                c += dc;
+            }
+        }
+    }
+
+    return moves;
+}
+
+/* Copy the current ACTIVE ROLE of another controlled piece. */
+function availableRoles(piece,game=state) {
+    const roles = [];
+
+    for(const otherPiece of game.pieces) {
+        if(
+            otherPiece.color===piece.color &&
+            otherPiece.id!==piece.id
+        ) {
+            const role =
+                otherPiece.representation==="king"
+                ? "king"
+                : otherPiece.active;
+
+            if(!roles.includes(role)) roles.push(role);
+        }
+    }
+
+    return roles;
+}
+
+function simulateMove(game,pieceID,move,chosenRole=null) {
+    const next = copy(game);
+    const piece = next.pieces.find(p => p.id===pieceID);
+
+    const oldR = piece.r;
+    const oldC = piece.c;
+
+    if(move.capture) {
+        const victim = next.pieces.find(p => p.id===move.capture);
+
+        if(victim) {
+            next.captured[victim.color].push({
+                representation:victim.representation,
+                active:victim.active
+            });
+
+            next.pieces = next.pieces.filter(p => p.id!==victim.id);
+        }
+    }
+
+    piece.r = move.r;
+    piece.c = move.c;
+    piece.moved = true;
+
+    if(piece.representation==="king") {
+        piece.active="king";
+        piece.serpentineIdentity=false;
+    }
+    else if(squareType(piece.r,piece.c)==="mirror") {
+        piece.active=piece.representation;
+        piece.serpentineIdentity=false;
+    }
+    else {
+        if(chosenRole!==null) {
+            piece.active=chosenRole;
+            piece.serpentineIdentity=true;
+        }
+    }
+
+    next.enPassant=null;
+
+    if(
+        piece.representation==="pawn" &&
+        move.special==="doublePawn"
+    ) {
+        next.enPassant={
+            r:(oldR+piece.r)/2,
+            c:oldC,
+            pawnId:piece.id
+        };
+    }
+
+    return next;
+}
+
+function legalMoves(piece,game=state) {
+    const results=[];
+
+    for(const move of pseudoMoves(piece,game)) {
+        let roles;
+
+        if(
+            piece.representation==="king" ||
+            squareType(move.r,move.c)==="mirror"
+        ) {
+            roles=[null];
+        }
+        else {
+            roles=availableRoles(piece,game);
+
+            if(piece.serpentineIdentity) {
+                roles.unshift(null);
+            }
+        }
+
+        for(const role of roles) {
+            const simulated=simulateMove(
+                game,
+                piece.id,
+                move,
+                role
+            );
+
+            if(!inCheck(piece.color,simulated)) {
+                results.push({...move,role});
+            }
+        }
+    }
+
+    const merged={};
+
+    for(const move of results) {
+        const key=move.r+","+move.c;
+
+        if(!merged[key]) {
+            merged[key]={
+                r:move.r,
+                c:move.c,
+                special:move.special,
+                capture:move.capture,
+                roles:[]
+            };
+        }
+
+        if(!merged[key].roles.includes(move.role)) {
+            merged[key].roles.push(move.role);
+        }
+    }
+
+    return Object.values(merged);
+}
+
+function allLegalMoves(color,game=state) {
+    const moves=[];
+
+    for(const piece of game.pieces) {
+        if(piece.color!==color) continue;
+
+        for(const move of legalMoves(piece,game)) {
+            moves.push({piece,move});
+        }
+    }
+
+    return moves;
+}
+
+/* -----------------------------
+   PERSISTENT SERPENTINE CHOICE
+------------------------------ */
+
+function hideSerpentinePanel() {
+    document.getElementById("serpentinePanel").style.display="none";
+    document.getElementById("serpentineChoices").innerHTML="";
+    document.getElementById("keepRoleArea").innerHTML="";
+    pendingSerpentineMove=null;
+}
+
+function showSerpentinePanel(piece,move) {
+    pendingSerpentineMove={pieceId:piece.id,move};
+
+    const panel=document.getElementById("serpentinePanel");
+    const prompt=document.getElementById("serpentinePrompt");
+    const choices=document.getElementById("serpentineChoices");
+    const keep=document.getElementById("keepRoleArea");
+
+    choices.innerHTML="";
+    keep.innerHTML="";
+
+    prompt.textContent=
+        `${squareName(piece.r,piece.c)} → ${squareName(move.r,move.c)}. ` +
+        `Choose which controlled piece-role this piece will become.`;
+
+    for(const role of move.roles) {
+        if(role===null) continue;
+
+        const button=document.createElement("button");
+        button.innerHTML=
+            GLYPHS[piece.color][role] +
+            "<div style='font-size:11px'>" + role + "</div>";
+
+        button.onclick=()=>finalizePendingSerpentine(role);
+        choices.appendChild(button);
+    }
+
+    if(move.roles.includes(null)) {
+        const button=document.createElement("button");
+        button.textContent="Keep current role";
+        button.onclick=()=>finalizePendingSerpentine(null);
+        keep.appendChild(button);
+    }
+
+    panel.style.display="block";
+}
+
+async function finalizePendingSerpentine(role) {
+    if(!pendingSerpentineMove) return;
+
+    const piece=state.pieces.find(
+        p => p.id===pendingSerpentineMove.pieceId
+    );
+
+    const move=pendingSerpentineMove.move;
+
+    hideSerpentinePanel();
+
+    await executeMoveWithRole(piece,move,role);
+}
+
+/* -----------------------------
+   PROMOTION
+------------------------------ */
+
+function requestPromotion(color) {
+    return new Promise(resolve => {
+        const overlay=document.getElementById("promotionOverlay");
+        const container=document.getElementById("promotionChoices");
+
+        container.innerHTML="";
+
+        for(const role of ["queen","rook","bishop","knight"]) {
+            const button=document.createElement("button");
+
+            button.innerHTML=
+                GLYPHS[color][role] +
+                "<div style='font-size:11px'>" + role + "</div>";
+
+            button.onclick=()=>{
+                overlay.style.display="none";
+                resolve(role);
+            };
+
+            container.appendChild(button);
+        }
+
+        overlay.style.display="flex";
+    });
+}
+
+/* -----------------------------
+   VICTORY
+------------------------------ */
+
+function convergence(color) {
+    for(const square of CENTER) {
+        const [r,c]=squareCoords(square);
+        const piece=pieceAt(r,c);
+
+        if(!piece || piece.color!==color) return false;
+    }
+
+    return true;
+}
+
+function centerSquaresOfColor(color) {
+    const wanted=
+        color==="white"
+        ? "mirror"
+        : "serpentine";
+
+    return [...CENTER].filter(square => {
+        const [r,c]=squareCoords(square);
+        return squareType(r,c)===wanted;
+    });
+}
+
+function royalConvergence(color) {
+    const king=getKing(color);
+
+    const queen=state.pieces.find(
+        p => p.color===color && p.representation==="queen"
+    );
+
+    if(!king || !queen) return false;
+
+    const correctSquares=
+        new Set(centerSquaresOfColor(color));
+
+    return (
+        correctSquares.has(squareName(king.r,king.c)) &&
+        correctSquares.has(squareName(queen.r,queen.c))
+    );
+}
+
+function evaluateGame(mover) {
+    if(royalConvergence(mover)) {
+        state.result=
+            mover.toUpperCase() +
+            " WINS — ROYAL CONVERGENCE";
+
+        state.log.push(state.result);
+        return;
+    }
+
+    if(convergence(mover)) {
+        state.result=
+            mover.toUpperCase() +
+            " WINS — CONVERGENCE";
+
+        state.log.push(state.result);
+        return;
+    }
+
+    const possible=allLegalMoves(state.turn);
+
+    if(possible.length===0) {
+        if(inCheck(state.turn)) {
+            state.result="DRAW — CHECKMATE";
+        }
+        else {
+            state.result="BOTH PLAYERS LOSE — STALEMATE";
+        }
+
+        state.log.push(state.result);
+    }
+}
+
+/* -----------------------------
+   DREAM MIRROR BONUS
+------------------------------ */
+
+function opponentCenterSquares(color) {
+    return centerSquaresOfColor(enemy(color));
+}
+
+function protectsOpponentCenters(color) {
+    return opponentCenterSquares(color).every(square => {
+        const [r,c]=squareCoords(square);
+        return squareAttacked(r,c,color);
+    });
+}
+
+function capturedPawnCount(color) {
+    return state.captured[color].filter(
+        p => p.representation==="pawn"
+    ).length;
+}
+
+function availableRescueSquares(color) {
+    const row=color==="white" ? 6 : 1;
+    const squares=[];
+
+    for(let c=0;c<8;c++) {
+        if(!pieceAt(row,c)) {
+            squares.push([row,c]);
+        }
+    }
+
+    return squares;
+}
+
+function canRescue(color) {
+    return (
+        state.bonus &&
+        capturedPawnCount(color)>0 &&
+        protectsOpponentCenters(color) &&
+        availableRescueSquares(color).length>0
+    );
+}
+
+function startTurn() {
+    rescuePhase=false;
+
+    if(state.result) return;
+
+    if(canRescue(state.turn)) {
+        rescuePhase=true;
+
+        const overlay=document.getElementById("rescueOverlay");
+        const container=document.getElementById("rescueSquares");
+
+        container.innerHTML="";
+
+        for(const [r,c] of availableRescueSquares(state.turn)) {
+            const button=document.createElement("button");
+            button.textContent=squareName(r,c);
+            button.onclick=()=>rescuePawn(r,c);
+            container.appendChild(button);
+        }
+
+        overlay.style.display="flex";
+    }
+}
+
+function rescuePawn(r,c) {
+    history.push(copy(state));
+
+    const color=state.turn;
+
+    const index=state.captured[color].findIndex(
+        p => p.representation==="pawn"
+    );
+
+    if(index<0) return;
+
+    state.captured[color].splice(index,1);
+
+    state.pieces.push(
+        createPiece(color,"pawn",r,c)
+    );
+
+    state.log.push(
+        color.toUpperCase() +
+        " rescues pawn to " +
+        squareName(r,c)
+    );
+
+    rescuePhase=false;
+    document.getElementById("rescueOverlay").style.display="none";
+
+    render();
+}
+
+function skipRescue() {
+    rescuePhase=false;
+    document.getElementById("rescueOverlay").style.display="none";
+}
+
+/* -----------------------------
+   EXECUTE MOVE
+------------------------------ */
+
+async function executeMoveWithRole(piece,move,role) {
+    history.push(copy(state));
+
+    let next=simulateMove(
+        state,
+        piece.id,
+        move,
+        role
+    );
+
+    let moved=next.pieces.find(
+        p => p.id===piece.id
+    );
+
+    if(
+        moved &&
+        moved.representation==="pawn" &&
+        (moved.r===0 || moved.r===7)
+    ) {
+        const promotion=await requestPromotion(moved.color);
+
+        moved.representation=promotion;
+
+        if(squareType(moved.r,moved.c)==="mirror") {
+            moved.active=promotion;
+        }
+    }
+
+    const notation=
+        piece.color[0].toUpperCase() +
+        " " +
+        SHORT[piece.representation] +
+        " " +
+        squareName(piece.r,piece.c) +
+        "-" +
+        squareName(move.r,move.c) +
+        (
+            squareType(move.r,move.c)==="serpentine" &&
+            piece.representation!=="king"
+            ?
+            " [" + (role===null ? piece.active : role) + "]"
+            :
+            ""
+        );
+
+    next.log.push(notation);
+    next.turn=enemy(state.turn);
+
+    state=next;
+    selected=null;
+    legalTargets=[];
+
+    evaluateGame(piece.color);
+
+    render();
+    startTurn();
+}
+
+/* -----------------------------
+   BOARD INTERACTION
+------------------------------ */
+
+function clickSquare(r,c) {
+    if(
+        state.result ||
+        rescuePhase ||
+        pendingSerpentineMove
+    ) return;
+
+    const piece=pieceAt(r,c);
+
+    if(selected) {
+        const selectedPiece=
+            state.pieces.find(p => p.id===selected);
+
+        const move=
+            legalTargets.find(m => m.r===r && m.c===c);
+
+        if(move) {
+            if(
+                selectedPiece.representation!=="king" &&
+                squareType(move.r,move.c)==="serpentine"
+            ) {
+                showSerpentinePanel(selectedPiece,move);
+            }
+            else {
+                executeMoveWithRole(selectedPiece,move,null);
+            }
+
+            return;
+        }
+
+        if(piece && piece.color===state.turn) {
+            selected=piece.id;
+            legalTargets=legalMoves(piece);
+            render();
+            return;
+        }
+
+        selected=null;
+        legalTargets=[];
+        render();
+        return;
+    }
+
+    if(piece && piece.color===state.turn) {
+        selected=piece.id;
+        legalTargets=legalMoves(piece);
+        render();
+    }
+}
+
+/* -----------------------------
+   DISPLAY
+------------------------------ */
+
+function render() {
+    const board=document.getElementById("board");
+    board.innerHTML="";
+
+    const rows=
+        flipped
+        ? [7,6,5,4,3,2,1,0]
+        : [0,1,2,3,4,5,6,7];
+
+    const cols=
+        flipped
+        ? [7,6,5,4,3,2,1,0]
+        : [0,1,2,3,4,5,6,7];
+
+    for(const r of rows) {
+        for(const c of cols) {
+            const square=document.createElement("div");
+            const type=squareType(r,c);
+
+            square.className="square "+type;
+
+            const sqName=squareName(r,c);
+
+            if(CENTER.has(sqName)) {
+                square.classList.add("center");
+            }
+
+            const piece=pieceAt(r,c);
+
+            if(piece && piece.id===selected) {
+                square.classList.add("selected");
+            }
+
+            const target=legalTargets.find(
+                m => m.r===r && m.c===c
+            );
+
+            if(target) {
+                square.classList.add(
+                    target.capture ? "capture" : "legal"
+                );
+            }
+
+            if(piece) {
+                const symbol=document.createElement("span");
+                symbol.className="piece";
+                symbol.textContent=
+                    GLYPHS[piece.color][piece.representation];
+
+                square.appendChild(symbol);
+
+                if(piece.active!==piece.representation) {
+                    const badge=document.createElement("span");
+                    badge.className="role";
+                    badge.textContent=SHORT[piece.active];
+                    badge.title="Currently acts as "+piece.active;
+                    square.appendChild(badge);
+                }
+            }
+
+            /* Coordinate labels */
+            const file=document.createElement("span");
+            file.className="coord file";
+            file.textContent=FILES[c];
+            square.appendChild(file);
+
+            const rank=document.createElement("span");
+            rank.className="coord rank";
+            rank.textContent=8-r;
+            square.appendChild(rank);
+
+            square.onclick=()=>clickSquare(r,c);
+
+            board.appendChild(square);
+        }
+    }
+
+    const status=document.getElementById("status");
+
+    if(state.result) {
+        status.textContent=state.result;
+    }
+    else {
+        status.textContent=
+            state.turn.charAt(0).toUpperCase() +
+            state.turn.slice(1) +
+            " to move" +
+            (inCheck(state.turn) ? " — CHECK" : "");
+    }
+
+    document.getElementById("captured").innerHTML=
+        "<b>White lost:</b> " +
+        (
+            state.captured.white
+            .map(p => GLYPHS.white[p.representation])
+            .join(" ")
+            || "—"
+        ) +
+        "<br><b>Black lost:</b> " +
+        (
+            state.captured.black
+            .map(p => GLYPHS.black[p.representation])
+            .join(" ")
+            || "—"
+        );
+
+    document.getElementById("log").textContent=
+        state.log.join("\n");
+}
+
+/* -----------------------------
+   CONTROLS
+------------------------------ */
+
+function newGame() {
+    state=initialState();
+
+    state.bonus=
+        document.getElementById("bonusToggle").checked;
+
+    history=[];
+    selected=null;
+    legalTargets=[];
+    rescuePhase=false;
+    pendingSerpentineMove=null;
+
+    hideSerpentinePanel();
+
+    render();
+    startTurn();
+}
+
+function undo() {
+    if(history.length===0) return;
+
+    state=history.pop();
+    selected=null;
+    legalTargets=[];
+    rescuePhase=false;
+    pendingSerpentineMove=null;
+
+    hideSerpentinePanel();
+    document.getElementById("rescueOverlay").style.display="none";
+
+    render();
+    startTurn();
+}
+
+function flipBoard() {
+    flipped=!flipped;
+    render();
+}
+
+newGame();
+</script>
+
+</body>
+</html>
