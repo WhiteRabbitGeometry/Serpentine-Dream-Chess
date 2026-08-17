@@ -22,22 +22,29 @@ h1 { margin-bottom: 4px; }
 .byline { color: #aaa; margin-bottom: 16px; }
 
 #game {
-    display: flex;
-    gap: 24px;
-    align-items: flex-start;
-    padding: 10px;
-    width: min(1180px, 100%);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 18px;
+    align-items: start;
+    padding: 8px;
+    width: min(1200px, 100vw);
+    height: calc(100vh - 84px);
+    overflow: hidden;
 }
 
 #boardWrap {
-    flex: 1 1 auto;
     min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
 }
 
 #board {
-    width: min(80vw, 720px);
-    min-height: min(58vw, 520px);
-    max-height: min(80vw, 720px);
+    width: min(calc(100vw - 370px), calc(100vh - 100px), 760px);
+    min-width: 420px;
+    min-height: 420px;
+    max-height: calc(100vh - 100px);
     display: grid;
     grid-template-columns: repeat(8, 1fr);
     /* Keep the slightly "warping" auto-row behavior, but never let a row
@@ -120,11 +127,13 @@ h1 { margin-bottom: 4px; }
 
 #panel {
     width: 320px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
     background: #1c1c1c;
-    padding: 15px;
+    padding: 12px;
     border-radius: 8px;
     position: sticky;
-    top: 10px;
+    top: 8px;
 }
 
 #serpentinePanel {
@@ -223,21 +232,57 @@ button:hover { background: #444; }
     line-height: 1.35;
 }
 
-@media(max-width: 900px) {
+@media(max-width: 720px) {
+    body { align-items: stretch; }
+
     #game {
-        flex-direction: column;
-        align-items: center;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 250px;
+        gap: 8px;
+        width: 100vw;
+        height: calc(100vh - 70px);
+        padding: 4px;
     }
 
     #panel {
-        width: min(94vw, 720px);
-        position: static;
+        width: 250px;
+        max-height: calc(100vh - 78px);
+        padding: 8px;
+        font-size: 12px;
     }
 
     #board {
-        width: 94vw;
+        width: min(calc(100vw - 266px), calc(100vh - 82px));
+        min-width: 280px;
+        min-height: 280px;
+    }
+
+    h1 { font-size: 22px; }
+    .byline { font-size: 11px; margin-bottom: 6px; }
+    #status { font-size: 16px; }
+    button { padding: 6px 8px; font-size: 12px; }
+    #log { height: 140px; }
+}
+
+@media(max-width: 560px) {
+    #game {
+        grid-template-columns: 1fr;
+        height: auto;
+        overflow: visible;
+    }
+
+    #board {
+        width: 96vw;
+        min-width: 0;
         min-height: 72vw;
         max-height: none;
+    }
+
+    #panel {
+        width: 96vw;
+        max-height: none;
+        overflow: visible;
+        position: static;
     }
 }
 </style>
