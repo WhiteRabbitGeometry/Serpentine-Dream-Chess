@@ -22,33 +22,34 @@ h1 { margin-bottom: 4px; }
 .byline { color: #aaa; margin-bottom: 16px; }
 
 #game {
-    display: grid;
-    grid-template-columns: minmax(220px, 1fr) minmax(180px, 320px);
-    gap: 18px;
+    display: grid !important;
+    grid-template-columns: minmax(220px, 1fr) minmax(180px, 320px) !important;
+    grid-auto-flow: column !important;
+    gap: 24px;
     align-items: start;
     padding: 10px;
-    width: 100%;
-    max-width: 1180px;
-    margin: 0 auto;
+    width: min(1180px, 100%);
+    box-sizing: border-box;
 }
 
 #boardWrap {
+    grid-column: 1;
     min-width: 0;
-    width: 100%;
     display: flex;
     justify-content: center;
-    align-items: flex-start;
 }
 
 #board {
-    width: min(100%, 720px);
-    min-width: 220px;
-    min-height: 220px;
-    max-height: 720px;
+    width: min(80vw, 720px);
+    min-height: min(58vw, 520px);
+    max-height: min(80vw, 720px);
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    grid-auto-rows: minmax(28px, auto);
+    /* Keep the slightly "warping" auto-row behavior, but never let a row
+       collapse below a usable height. */
+    grid-auto-rows: minmax(34px, auto);
     border: 4px solid #777;
+    background: #111;
 }
 
 .square {
@@ -123,14 +124,16 @@ h1 { margin-bottom: 4px; }
 .coord.rank { left: 3px; top: 2px; }
 
 #panel {
+    grid-column: 2;
     width: 100%;
-    min-width: 180px;
     max-width: 320px;
+    min-width: 180px;
     background: #1c1c1c;
     padding: 15px;
     border-radius: 8px;
     position: sticky;
     top: 10px;
+    box-sizing: border-box;
 }
 
 #serpentinePanel {
@@ -229,123 +232,30 @@ button:hover { background: #444; }
     line-height: 1.35;
 }
 
-
-
-/* IFRAME-SAFE LAYOUT:
-   Approved board-left / interface-right layout is preserved at every width.
-   Narrow containers scale typography and panel dimensions instead of stacking. */
-
-@media (max-width: 760px) {
+@media(max-width: 900px) {
     #game {
-        grid-template-columns: minmax(210px, 1fr) 190px;
-        gap: 8px;
+        grid-template-columns: minmax(160px, 1fr) minmax(140px, 220px) !important;
+        gap: 10px;
         padding: 6px;
     }
 
     #panel {
-        min-width: 190px;
-        max-width: 190px;
+        max-width: 220px;
+        min-width: 140px;
         padding: 8px;
         font-size: 12px;
     }
 
-    #status {
-        font-size: 16px;
-        margin-bottom: 8px;
-    }
-
-    button {
-        padding: 6px 7px;
-        margin: 2px;
-        font-size: 11px;
-    }
-
-    #log {
-        height: 150px;
-        font-size: 10px;
-    }
-
-    #serpentinePanel {
-        padding: 8px;
-        margin-bottom: 8px;
-    }
-
-    #serpentineChoices button {
-        min-width: 48px;
-        font-size: 20px;
-    }
-
-    .square {
-        min-height: 28px;
-        font-size: clamp(22px, 7vw, 54px);
-    }
-
-    h1 {
-        font-size: 24px;
-        margin-top: 8px;
-    }
-
-    .byline {
-        font-size: 11px;
-        margin-bottom: 6px;
-    }
-}
-
-@media (max-width: 480px) {
-    #game {
-        grid-template-columns: minmax(180px, 1fr) 150px;
-        gap: 5px;
-        padding: 4px;
-    }
-
-    #panel {
-        min-width: 150px;
-        max-width: 150px;
-        padding: 6px;
-        font-size: 10px;
-    }
-
-    #status {
-        font-size: 14px;
-    }
-
-    button {
-        padding: 5px 5px;
-        font-size: 9px;
-    }
-
-    #log {
-        height: 110px;
-        font-size: 9px;
-    }
-
     #board {
-        min-width: 180px;
+        width: 100%;
+        min-height: 160px;
+        max-height: none;
     }
 
     .square {
-        min-height: 24px;
-        font-size: clamp(18px, 7vw, 44px);
-    }
-
-    .role {
-        font-size: 8px;
-        padding: 1px 3px;
-    }
-
-    .coord {
-        font-size: 8px;
-    }
-
-    h1 {
-        font-size: 19px;
-    }
-
-    .byline {
-        font-size: 9px;
+        font-size: clamp(18px, 6vw, 44px);
     }
 }
-
 </style>
 </head>
 
@@ -1440,6 +1350,19 @@ function flipBoard() {
 }
 
 newGame();
+
+function lockSideBySideLayout() {
+    var g = document.getElementById("game");
+    if (!g) return;
+    g.style.setProperty("display", "grid", "important");
+    var cols = window.innerWidth <= 900
+        ? "minmax(160px, 1fr) minmax(140px, 220px)"
+        : "minmax(220px, 1fr) minmax(180px, 320px)";
+    g.style.setProperty("grid-template-columns", cols, "important");
+    g.style.setProperty("grid-auto-flow", "column", "important");
+}
+lockSideBySideLayout();
+window.addEventListener("resize", lockSideBySideLayout);
 </script>
 
 </body>
