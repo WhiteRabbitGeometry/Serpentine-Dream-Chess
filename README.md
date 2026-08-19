@@ -1,4 +1,6 @@
-# Serpentine Dream Chess v2.0.0
+# Serpentine Dream Chess v2.1.0
+
+by WhiteRabbitGeometry
 
 Public browser build with hot-swappable human/computer seats.
 
@@ -41,3 +43,8 @@ Legality remains deterministic and is not learned by the computer policy. The br
 ## Deployment
 
 Static GitHub Pages / itch-compatible package. `index.html` is at repository root. No build step.
+
+
+## v2.1.0 hidden cooperative state
+
+A hidden mutual-victory condition is present but intentionally omitted from the in-game Rules panel and from computer policy scoring.
