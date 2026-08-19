@@ -24,7 +24,7 @@ header{text-align:center;padding:12px 8px 0}h1{margin:0 0 3px}.byline{color:#aaa
 .seats{display:grid;grid-template-columns:auto 1fr;gap:6px;align-items:center}.small{font-size:12px;color:var(--muted);line-height:1.35}
 #serpentinePanel{display:none;background:#251f30;border:1px solid var(--purple);padding:10px;border-radius:8px;margin:8px 0}#serpentineChoices{display:flex;gap:6px;flex-wrap:wrap}#serpentineChoices button{font-size:22px;min-width:58px}
 #captured{font-size:13px}.log{background:#111;padding:7px;max-height:150px;overflow:auto;white-space:pre-wrap;font:11px/1.35 monospace}
-.aiThinking{color:var(--gold);font-size:12px}.badge{display:inline-block;border:1px solid #555;border-radius:999px;padding:2px 7px;font-size:11px;color:#bbb}
+.aiThinking{color:var(--gold);font-size:12px}.affect{letter-spacing:.12em;font-weight:700;color:#9d8ec9}.badge{display:inline-block;border:1px solid #555;border-radius:999px;padding:2px 7px;font-size:11px;color:#bbb}
 .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.84);z-index:100;align-items:center;justify-content:center;padding:18px}.modal.open{display:flex}.card{background:#222;border:1px solid #777;border-radius:10px;padding:18px;width:min(520px,94vw);text-align:center}.choice{display:flex;flex-wrap:wrap;justify-content:center;gap:7px}.choice button{font-size:26px;min-width:70px}
 .rules{font-size:13px;text-align:left;line-height:1.45}.rules h4{color:#e4cfa3;margin:12px 0 3px}
 @media(max-width:800px){#game{grid-template-columns:1fr}.rankLabels{font-size:9px}#boardColumn{width:min(94vw,720px)}#panel{position:static;width:94vw;max-height:none}.square{font-size:clamp(22px,10vw,56px)}}
@@ -34,13 +34,14 @@ header{text-align:center;padding:12px 8px 0}h1{margin:0 0 3px}.byline{color:#aaa
 <header>
 <h1>Serpentine Dream Chess</h1>
 <div class="byline">WhiteRabbitGeometry · Benjamin Jason Ortlip</div>
-<div class="version">(v2.0.0)</div>
+<div class="version">(v2.1.0)</div>
 </header>
 
 <div id="game">
   <div id="boardWrap"><div id="rankLabels" class="rankLabels"></div><div id="boardColumn"><div id="board"></div><div id="fileLabels" class="fileLabels"></div></div></div>
   <aside id="panel">
     <div id="status" class="panel status"></div>
+    <div id="affect" class="small"></div>
     <div id="thinking" class="aiThinking"></div>
 
     <div class="panel">
@@ -97,7 +98,18 @@ function makePiece(color,representation,r,c,id=null){return {id:id||pieceId(colo
 function initialState(){
  const p=[],back=["rook","knight","bishop","queen","king","bishop","knight","rook"];
  for(let c=0;c<8;c++){p.push(makePiece("black",back[c],0,c));p.push(makePiece("black","pawn",1,c));p.push(makePiece("white","pawn",6,c));p.push(makePiece("white",back[c],7,c))}
- return {turn:"white",pieces:p,captured:{white:[],black:[]},enPassant:null,bonus:true,result:null,log:[],ply:0};
+ return {
+   turn:"white",
+   pieces:p,
+   captured:{white:[],black:[]},
+   enPassant:null,
+   bonus:true,
+   result:null,
+   log:[],
+   ply:0,
+   hiddenCastle:{active:false,formedPly:null,witness:[]},
+   affect:{state:null,direction:0}
+ };
 }
 function at(r,c,g=state){return g.pieces.find(p=>p.r===r&&p.c===c)||null}
 function king(color,g=state){return g.pieces.find(p=>p.color===color&&p.representation==="king")}
@@ -154,10 +166,78 @@ function allActions(color,g=state){return g.pieces.filter(p=>p.color===color).fl
 function centerFor(color){return color==="white"?["d5","e4"]:["d4","e5"]}
 function convergence(color,g=state){return [...CENTER].every(s=>{const[r,c]=rc(s),p=at(r,c,g);return p&&p.color===color})}
 function royalConvergence(color,g=state){const k=king(color,g),q=g.pieces.find(p=>p.color===color&&p.representation==="queen");if(!k||!q)return false;const set=new Set(centerFor(color));return set.has(sq(k.r,k.c))&&set.has(sq(q.r,q.c))}
+
+function activeRole(p){
+ return p.representation==="king"?"king":p.active;
+}
+function hiddenCastleComplete(g){
+ const whiteSquares=["d5","e4"],blackSquares=["d4","e5"];
+ const ownsRook=(s,color)=>{
+   const [r,c]=rc(s),p=at(r,c,g);
+   return !!p&&p.color===color&&activeRole(p)==="rook";
+ };
+ return whiteSquares.every(s=>ownsRook(s,"white"))&&blackSquares.every(s=>ownsRook(s,"black"));
+}
+function updateHiddenCastle(before,after,mover){
+ const was=hiddenCastleComplete(before),is=hiddenCastleComplete(after);
+ if(!after.hiddenCastle)after.hiddenCastle={active:false,formedPly:null,witness:[]};
+
+ if(!is){
+   if(after.hiddenCastle.active)after.log.push("The unfinished castle falls silent.");
+   after.hiddenCastle={active:false,formedPly:null,witness:[]};
+   return null;
+ }
+
+ if(!was){
+   after.hiddenCastle={active:true,formedPly:after.ply,witness:[]};
+   after.log.push("Something has been built in the center.");
+   return null;
+ }
+
+ // Configuration already existed before this move: this mover had a real
+ // opportunity to break it and instead preserved it.
+ after.hiddenCastle.active=true;
+ if(!after.hiddenCastle.witness.includes(mover))after.hiddenCastle.witness.push(mover);
+
+ if(after.hiddenCastle.witness.includes("white")&&after.hiddenCastle.witness.includes("black")){
+   return {type:"castle",text:"BOTH PLAYERS WIN — THE CASTLE STANDS",affect:"WONDERS"};
+ }
+ return null;
+}
+function systemOutcomeAffect(term){
+ if(!term)return null;
+ if(term.type==="castle")return "WONDERS";
+ if(term.type==="stalemate")return "WORRIES";
+ if(term.type==="mate")return "DOUBTS";
+ if(term.type==="royal"||term.type==="convergence")return "PONDERS";
+ return null;
+}
+function cooperativePotential(g){
+ // Hidden/nonterminal directional signal only. This is deliberately not used
+ // by the computer move selector; it gives the system Hope/Fear without
+ // teaching either policy the Easter egg.
+ let score=0;
+ const centers=[["d5","white"],["e4","white"],["d4","black"],["e5","black"]];
+ for(const [s,color] of centers){
+   const [r,c]=rc(s),p=at(r,c,g);
+   if(p&&p.color===color&&activeRole(p)==="rook")score++;
+ }
+ return score;
+}
+function updateDirectionalAffect(before,after){
+ const a=cooperativePotential(before),b=cooperativePotential(after);
+ if(!after.affect)after.affect={state:null,direction:0};
+ after.affect.direction=b-a;
+ after.affect.state=b>a?"HOPE":b<a?"FEAR":null;
+}
+
 function terminalAfter(g,mover){
- if(royalConvergence(mover,g))return {type:"royal",text:`${mover.toUpperCase()} WINS — ROYAL CONVERGENCE`};
- if(convergence(mover,g))return {type:"convergence",text:`${mover.toUpperCase()} WINS — CONVERGENCE`};
- const opp=enemy(mover),a=allActions(opp,g);if(!a.length)return inCheck(opp,g)?{type:"mate",text:"DRAW — CHECKMATE"}:{type:"stalemate",text:"BOTH PLAYERS LOSE — STALEMATE"};
+ if(royalConvergence(mover,g))return {type:"royal",text:`${mover.toUpperCase()} WINS — ROYAL CONVERGENCE`,affect:"PONDERS"};
+ if(convergence(mover,g))return {type:"convergence",text:`${mover.toUpperCase()} WINS — CONVERGENCE`,affect:"PONDERS"};
+ const opp=enemy(mover),a=allActions(opp,g);
+ if(!a.length)return inCheck(opp,g)
+   ?{type:"mate",text:"DRAW — CHECKMATE",affect:"DOUBTS"}
+   :{type:"stalemate",text:"BOTH PLAYERS LOSE — STALEMATE",affect:"WORRIES"};
  return null;
 }
 function opponentCenters(color){return centerFor(enemy(color))}
@@ -179,8 +259,24 @@ async function applyAction(action,{computer=false}={}){
  history.push(clone(state));const before=clone(p),cap=action.move.capture?state.pieces.find(x=>x.id===action.move.capture):null;
  let promotion=action.promotion;
  if(!computer&&p.representation==="pawn"&&(action.move.r===0||action.move.r===7)&&!promotion)promotion=await requestPromotion(p.color);
+ let previousState=clone(state);
  let n=simulate(state,p.id,action.move,action.role,promotion),after=n.pieces.find(x=>x.id===p.id),mover=state.turn;
- n.log.push(notation({...action,promotion},before,after,cap));n.turn=enemy(mover);n.ply=(state.ply||0)+1;const term=terminalAfter(n,mover);if(term){n.result=term.text;n.log.push(term.text)}
+ n.log.push(notation({...action,promotion},before,after,cap));
+ n.turn=enemy(mover);
+ n.ply=(state.ply||0)+1;
+
+ updateDirectionalAffect(previousState,n);
+
+ // The hidden cooperative victory is evaluated before ordinary terminal rules.
+ // Formation does not win; both colors must make a subsequent preserving move.
+ let term=updateHiddenCastle(previousState,n,mover);
+ if(!term)term=terminalAfter(n,mover);
+
+ if(term){
+   n.result=term.text;
+   n.affect={state:term.affect||systemOutcomeAffect(term),direction:0};
+   n.log.push(`${term.text} · ${n.affect.state}`);
+ }
  state=n;selected=null;legalTargets=[];pendingChoice=null;render();await startTurn();
 }
 function seat(color){return $(color==="white"?"#whiteSeat":"#blackSeat").value}
@@ -239,6 +335,8 @@ function render(){
  buildLabels();const board=$("#board");board.innerHTML="";const rows=flipped?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7],cols=flipped?[7,6,5,4,3,2,1,0]:[0,1,2,3,4,5,6,7];
  for(const r of rows)for(const c of cols){const d=document.createElement("div"),p=at(r,c);d.className=`square ${terrain(r,c)} ${CENTER.has(sq(r,c))?"center":""}`;if(selected&&p?.id===selected)d.classList.add("selected");const m=legalTargets.find(x=>x.r===r&&x.c===c);if(m)d.classList.add(m.capture?"capture":"legal");if(p){const s=document.createElement("span");s.className="piece";s.textContent=GLYPHS[p.color][p.representation];d.appendChild(s);if(p.active!==p.representation){const b=document.createElement("span");b.className="role";b.textContent=SHORT[p.active];d.appendChild(b)}}d.onclick=()=>clickSquare(r,c);board.appendChild(d)}
  $("#status").innerHTML=state.result?state.result:`${state.turn.toUpperCase()} TO MOVE <span class="badge">${seat(state.turn).toUpperCase()}</span>${inCheck(state.turn)?" · CHECK":""}`;
+ const affect=state.affect?.state;
+ $("#affect").innerHTML=affect?`<span class="affect">${affect}</span>`:"";
  $("#captured").textContent=`White lost: ${state.captured.white.map(x=>SHORT[x.representation]).join(" ")||"—"} | Black lost: ${state.captured.black.map(x=>SHORT[x.representation]).join(" ")||"—"}`;
  $("#log").textContent=state.log.join("\n");$("#log").scrollTop=$("#log").scrollHeight;$("#bonus").checked=state.bonus;
 }
