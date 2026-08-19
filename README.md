@@ -1,34 +1,43 @@
-# Serpentine Dream Chess
+# Serpentine Dream Chess v2.0.0
 
-A playable chess variant by **WhiteRabbitGeometry (Benjamin Jason Ortlip)**.
+Public browser build with hot-swappable human/computer seats.
 
-Serpentine Dream Chess uses a standard chessboard with two square states:
+## Computer policies
 
-- **Mirror Squares** — white squares; pieces return to and act as their representational chess roles.
-- **Serpentine Squares** — black squares; non-King pieces may assume another active piece role under the player's control.
+- **Random** — uniformly selects among legal actions.
+- **Serpentine** — scores legal actions for immediate victory, material pressure, center presence, mobility, and obvious immediate-opponent victory avoidance, then samples among the strongest moves so it remains challenging without acting like a pure maximizer.
+- **Dream** — favors legal states visited least often during the current browser session/game. This is exploration, not winning behavior.
 
-The game replaces ordinary chess victory with **Convergence** and **Royal Convergence**, centered on control of the four central squares.
+Both White and Black seats may be changed during play, giving:
 
-## Play
+- Human vs Human hot-seat
+- Human vs Computer
+- Computer vs Human
+- Computer vs Computer Dream runs
 
-The playable browser version is contained in `index.html`.
+Computer state/novelty memory is transient. No player games, telemetry, or persistent analysis logs are saved.
 
-The canonical rules are in `RULES.md`.
+## Rock boundary
 
-## License
+Legality remains deterministic and is not learned by the computer policy. The browser implementation follows the frozen Serpentine Dream Chess rules:
 
-**Copyright © 2026 Benjamin Jason Ortlip / WhiteRabbitGeometry.**
+- Mirror / Serpentine active-role behavior
+- opposing representational Queen non-threat/capture rule
+- ordinary check legality
+- castling, en passant, and promotion
+- Convergence / Royal Convergence
+- checkmate = draw
+- stalemate = both lose
+- Dream Mirror pawn rescue
 
-The game rules, documentation, and other non-software creative material in this repository are licensed under the **Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)**.
+## Versioning
 
-The software implementation is made available for **noncommercial use only** under the terms stated in `LICENSE`.
+`2.0.0` follows the project convention:
 
-You may play, study, copy, share, and create noncommercial adaptations, subject to the applicable license terms and attribution requirements.
+- first number: public generation
+- second number: internal revision generation
+- third number: public-facing patch/hotfix
 
-**Commercial rights are reserved.** No sale, paid access, advertising-supported or otherwise monetized hosting or distribution, commercial incorporation, or other commercial exploitation is authorized without prior permission from the copyright holder.
+## Deployment
 
-If you make a noncommercial adaptation, I would appreciate hearing about it. Notification is a request, not a condition of the license.
-
-The names **WhiteRabbitGeometry** and **Serpentine Dream Chess**, and associated logos or branding, are not licensed as trademarks or as indications of endorsement except as necessary to provide attribution.
-
-For commercial licensing or permission, contact WhiteRabbitGeometry@gmail.com.
+Static GitHub Pages / itch-compatible package. `index.html` is at repository root. No build step.
